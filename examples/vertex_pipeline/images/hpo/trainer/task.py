@@ -274,8 +274,7 @@ def train(args: argparse.Namespace):
 
   hpt.report_hyperparameter_tuning_metric(
     hyperparameter_metric_tag='au_roc',
-    metric_value=hp_metric,
-    global_step=32
+    metric_value=hp_metric
   )
 
   metric_files = str(os.listdir(os.path.dirname(hpt.metric_path)))
