@@ -12,20 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-gcp:
-  project_id: hyu-ml-sandbox
-  af_registry_location: us-central1
-  af_registry_name: mlops-vertex-kit
+FROM gcr.io/deeplearning-platform-release/base-cpu
 
-pipelines:
-  pipeline_region: us-central1
-  pipeline_storage_path: gs://vertex_pipeline_demo_root_hyu/root
-  pipeline_component_directory: ../components
+RUN apt-get update && apt-get install -y --no-install-recommends \
+	wget patch \
+	&& rm -rf /var/lib/apt/lists/*
 
-train:
-  name: training-pipeline-template
-  pipeline_job_spec_path: pipeline_spec/training_pipeline_job.json
+COPY requirements.txt .
 
-predict:
-  name: batch-prediction-pipeline-template
-  pipeline_job_spec_path: pipeline_spec/batch_prediction_pipeline_job.json
+RUN python -m pip install -r \
+    requirements.txt --quiet --no-cache-dir \
+    && rm -f requirements.txt
+
+COPY ./src /pipelines/component/src
+
+ENTRYPOINT ["/bin/bash"]

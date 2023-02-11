@@ -12,20 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-gcp:
-  project_id: hyu-ml-sandbox
-  af_registry_location: us-central1
-  af_registry_name: mlops-vertex-kit
+steps:
 
-pipelines:
-  pipeline_region: us-central1
-  pipeline_storage_path: gs://vertex_pipeline_demo_root_hyu/root
-  pipeline_component_directory: ../components
+  # build the base images
+  - name: 'gcr.io/cloud-builders/docker'
+    args: [ "build", "-t", "${_AF_REGISTRY_LOCATION}-docker.pkg.dev/$PROJECT_ID/${_AF_REGISTRY_NAME}/component-base:$TAG_NAME", "." ]
+    dir: 'vertex_pipeline/components/component_base'
+    id: 'Build image: component base'
 
-train:
-  name: training-pipeline-template
-  pipeline_job_spec_path: pipeline_spec/training_pipeline_job.json
-
-predict:
-  name: batch-prediction-pipeline-template
-  pipeline_job_spec_path: pipeline_spec/batch_prediction_pipeline_job.json
+images:
+  - '${_AF_REGISTRY_LOCATION}-docker.pkg.dev/$PROJECT_ID/${_AF_REGISTRY_NAME}/component-base:$TAG_NAME'
