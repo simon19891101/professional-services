@@ -31,6 +31,8 @@ from google.cloud import aiplatform_v1beta1 as aip
 from sklearn import metrics as sk_metrics
 from sklearn import model_selection
 
+from google.cloud import firestore
+
 # pylint: disable=logging-fstring-interpolation
 
 
@@ -176,10 +178,7 @@ def _evaluate_binary_classification(model: lgb.Booster,
 
 def lgb_training(lgb_train: lgb.Dataset,
                  lgb_val: lgb.Dataset,
-                 num_boost_round: int,
-                 num_leaves: int,
-                 max_depth: int,
-                 min_data_in_leaf: int) -> lgb.Booster:
+                 **best_param_values) -> lgb.Booster:
   """Train lgb model given datasets and parameters."""
   # train the model
   params = {
@@ -187,14 +186,14 @@ def lgb_training(lgb_train: lgb.Dataset,
       'is_unbalance': True,
       'boosting_type': 'gbdt',
       'metric': ['auc'],
-      'num_leaves': num_leaves,
-      'max_depth': max_depth,
-      'min_data_in_leaf': min_data_in_leaf
+      'num_leaves': int(best_param_values['num_leaves']),
+      'max_depth': int(best_param_values['max_depth']),
+      'min_data_in_leaf': int(best_param_values['min_data_in_leaf'])
   }
 
   eval_results = {}  # to record eval results
   model = lgb.train(params=params,
-                    num_boost_round=num_boost_round,
+                    num_boost_round=int(best_param_values['num_boost_round']),
                     train_set=lgb_train,
                     valid_sets=[lgb_val, lgb_train],
                     valid_names=['test', 'train'],
@@ -360,6 +359,17 @@ def conduct_vizier_trials(
   return best_param_values
 
 
+def get_best_param_values(project_id, solution_name='hpo-pipeline-template'):
+    db = firestore.Client(project=project_id)
+
+    docs = db.collection(solution_name).list_documents()
+    doc_latest = max([doc.id for doc in docs])
+    
+    params_latest = db.collection(solution_name).document(doc_latest).get().to_dict()
+    
+    logging.info(f'Latest doc id {doc_latest}: {params_latest}')
+
+    return params_latest
 ################################################################################
 # Main Logic.
 ################################################################################
@@ -403,29 +413,17 @@ def train(args: argparse.Namespace):
   lgb_train = lgb.Dataset(x_train, y_train, categorical_feature='auto')
   lgb_val = lgb.Dataset(x_val, y_val, categorical_feature='auto')
 
-  if args.perform_hp:
-    # Conduct Vizier trials a.k.a. hyperparameter tuning
-    # prior to main training activity
-    best_param_values = conduct_vizier_trials(
-        args=args,
-        lgb_train=lgb_train,
-        lgb_val=lgb_val,
-        x_test=x_test,
-        y_test=y_test)
-    logging.info(f'Vizier returned params: {best_param_values}')
-  else:
-    best_param_values = {
-        'num_leaves': int(args.num_leaves_hp_param_min +
-                       args.num_leaves_hp_param_max) // 2,
-        'max_depth': int(args.max_depth_hp_param_min +
-                      args.max_depth_hp_param_max) // 2
-    }
+  best_param_values = get_best_param_values(project_id=args.hp_config_gcp_project_id)
+  best_param_values.update({
+      'num_leaves': int(args.num_leaves_hp_param_min +
+                     args.num_leaves_hp_param_max) // 2,
+      'max_depth': int(args.max_depth_hp_param_min +
+                    args.max_depth_hp_param_max) // 2
+  })
 
   model = lgb_training(
       lgb_train=lgb_train,
       lgb_val=lgb_val,
-      num_boost_round=int(args.num_boost_round),
-      min_data_in_leaf=int(args.min_data_in_leaf),
       **best_param_values)
 
   # save the generated model
@@ -485,7 +483,7 @@ if __name__ == '__main__':
                       help='Vizier GCP Region. Data or model no passed to '
                            'vizier. Simply tuning config.')
   parser.add_argument('--hp_config_gcp_project_id',
-                      default='woven-rush-197905', type=str,
+                      default='hyu-ml-sandbox', type=str,
                       help='GCP project id.')
 
   logging.info(parser.parse_args())

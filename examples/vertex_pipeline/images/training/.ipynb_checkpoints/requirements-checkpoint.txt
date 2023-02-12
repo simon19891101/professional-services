@@ -6,3 +6,4 @@ pandas-gbq==0.14.1
 scikit-learn==0.24.2
 google-cloud-aiplatform==1.1.1
 pyyaml==6.0
+google-cloud-firestore==2.9.1

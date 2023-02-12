@@ -14,14 +14,14 @@
 
 # consider use gcr.io/kaniko-project/executor:latest for faster build
 steps:
-  # - name: gcr.io/cloud-builders/docker
-  #   args:
-  #     - build
-  #     - -t
-  #     - ${_AF_REGISTRY_LOCATION}-docker.pkg.dev/$PROJECT_ID/${_AF_REGISTRY_NAME}/training:$TAG_NAME
-  #     - .
-  #   dir: vertex_pipeline/images/training
-  #   id: "Build image: training"
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -t
+      - ${_AF_REGISTRY_LOCATION}-docker.pkg.dev/$PROJECT_ID/${_AF_REGISTRY_NAME}/training:$TAG_NAME
+      - .
+    dir: vertex_pipeline/images/training
+    id: "Build image: training"
   # - name: gcr.io/cloud-builders/docker
   #   args:
   #     - build
@@ -30,16 +30,16 @@ steps:
   #     - .
   #   dir: vertex_pipeline/images/serving
   #   id: "Build image: serving"
-  - name: gcr.io/cloud-builders/docker
-    args:
-      - build
-      - -t
-      - ${_AF_REGISTRY_LOCATION}-docker.pkg.dev/$PROJECT_ID/${_AF_REGISTRY_NAME}/hpo:$TAG_NAME
-      - .
-    dir: vertex_pipeline/images/hpo
-    id: "Build image: hpo"
+  # - name: gcr.io/cloud-builders/docker
+  #   args:
+  #     - build
+  #     - -t
+  #     - ${_AF_REGISTRY_LOCATION}-docker.pkg.dev/$PROJECT_ID/${_AF_REGISTRY_NAME}/hpo:$TAG_NAME
+  #     - .
+  #   dir: vertex_pipeline/images/hpo
+  #   id: "Build image: hpo"
 images:
-  # - ${_AF_REGISTRY_LOCATION}-docker.pkg.dev/$PROJECT_ID/${_AF_REGISTRY_NAME}/training:$TAG_NAME
+  - ${_AF_REGISTRY_LOCATION}-docker.pkg.dev/$PROJECT_ID/${_AF_REGISTRY_NAME}/training:$TAG_NAME
   # - ${_AF_REGISTRY_LOCATION}-docker.pkg.dev/$PROJECT_ID/${_AF_REGISTRY_NAME}/serving:$TAG_NAME
-  - ${_AF_REGISTRY_LOCATION}-docker.pkg.dev/$PROJECT_ID/${_AF_REGISTRY_NAME}/hpo:$TAG_NAME
+  # - ${_AF_REGISTRY_LOCATION}-docker.pkg.dev/$PROJECT_ID/${_AF_REGISTRY_NAME}/hpo:$TAG_NAME
 

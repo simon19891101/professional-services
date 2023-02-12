@@ -5,9 +5,6 @@
         "executorLabel": "exec-best-hpo-to-args",
         "inputDefinitions": {
           "parameters": {
-            "as_at_date": {
-              "type": "STRING"
-            },
             "hpo_best": {
               "type": "STRING"
             },
@@ -133,6 +130,9 @@
             "pipelineparam--accelerator_type": {
               "type": "STRING"
             },
+            "pipelineparam--best-hpo-to-args-Output": {
+              "type": "STRING"
+            },
             "pipelineparam--custom_job_service_account": {
               "type": "STRING"
             },
@@ -147,9 +147,6 @@
             },
             "pipelineparam--hp_config_suggestions_per_request": {
               "type": "INT"
-            },
-            "pipelineparam--hpo-completion-Output": {
-              "type": "STRING"
             },
             "pipelineparam--hptune_region": {
               "type": "STRING"
@@ -256,23 +253,6 @@
         "inputDefinitions": {
           "parameters": {
             "gcp_resources": {
-              "type": "STRING"
-            }
-          }
-        },
-        "outputDefinitions": {
-          "parameters": {
-            "Output": {
-              "type": "STRING"
-            }
-          }
-        }
-      },
-      "comp-hpo-completion": {
-        "executorLabel": "exec-hpo-completion",
-        "inputDefinitions": {
-          "parameters": {
-            "hpo_flags": {
               "type": "STRING"
             }
           }
@@ -516,7 +496,7 @@
               "sh",
               "-ec",
               "program_path=$(mktemp -d)\nprintf \"%s\" \"$0\" > \"$program_path/ephemeral_component.py\"\npython3 -m kfp.v2.components.executor_main                         --component_module_path                         \"$program_path/ephemeral_component.py\"                         \"$@\"\n",
-              "\nimport kfp\nfrom kfp.v2 import dsl\nfrom kfp.v2.dsl import *\nfrom typing import *\n\ndef best_hpo_to_args(hpo_best: str,\n                    project_id: str,\n                    solution_name: str,\n                    as_at_date: str) -> str:\n    \"\"\"\n    Write the best HPO params to firestore. \n    We keep the output to chain this component to the hpo_completion step.\n    \"\"\"\n\n    import json\n    from google.cloud import firestore\n    hpo_best = json.loads(hpo_best.replace(\"'\", '\"'))\n\n    hpo_best_dict = {}\n\n    for i in hpo_best['parameters']:\n        hpo_best_dict.update({i['parameterId']: i['value']})\n\n    for i in hpo_best['finalMeasurement']['metrics']:\n        hpo_best_dict.update({i['metricId']: i['value']})\n\n    db = firestore.Client(project=project_id)\n    db.collection(solution_name+\"_hpo\").document(\"params\").set(hpo_best_dict,merge=True)\n\n    hpo_best_dict=str(hpo_best_dict).replace(\"'\", '\"')\n\n    return hpo_best_dict\n\n"
+              "\nimport kfp\nfrom kfp.v2 import dsl\nfrom kfp.v2.dsl import *\nfrom typing import *\n\ndef best_hpo_to_args(hpo_best: str,\n                    project_id: str,\n                    solution_name: str) -> str:\n    \"\"\"\n    Write the best HPO params to firestore. \n    We keep the output to chain this component to the hpo_completion step.\n    \"\"\"\n\n    import json\n    from datetime import datetime\n    from google.cloud import firestore\n    hpo_best = json.loads(hpo_best.replace(\"'\", '\"'))\n\n    hpo_best_dict = {}\n\n    for i in hpo_best['parameters']:\n        hpo_best_dict.update({i['parameterId']: i['value']})\n\n    for i in hpo_best['finalMeasurement']['metrics']:\n        hpo_best_dict.update({i['metricId']: i['value']})\n\n    db = firestore.Client(project=project_id)\n    task_flag=datetime.now().strftime('%Y-%m-%d %H:%M:%S')\n    db.collection(solution_name).document(task_flag).set(hpo_best_dict,merge=True)\n\n    return \"true\"\n\n"
             ],
             "image": "python:3.7"
           }
@@ -584,26 +564,6 @@
               "-ec",
               "program_path=$(mktemp -d)\nprintf \"%s\" \"$0\" > \"$program_path/ephemeral_component.py\"\npython3 -m kfp.v2.components.executor_main                         --component_module_path                         \"$program_path/ephemeral_component.py\"                         \"$@\"\n",
               "\nimport kfp\nfrom kfp.v2 import dsl\nfrom kfp.v2.dsl import *\nfrom typing import *\n\ndef GetTrialsOp(gcp_resources: str) -> list:\n  \"\"\"Retrieves the best trial from the trials.\n\n  Args:\n      gcp_resources (str):\n        Proto tracking the hyperparameter tuning job.\n\n  Returns:\n      List of strings representing the intermediate JSON representation of the\n      trials from the hyperparameter tuning job.\n  \"\"\"\n  from google.cloud import aiplatform\n  from google_cloud_pipeline_components.proto.gcp_resources_pb2 import GcpResources\n  from google.protobuf.json_format import Parse\n  from google.cloud.aiplatform_v1.types import study\n\n  api_endpoint_suffix = '-aiplatform.googleapis.com'\n  gcp_resources_proto = Parse(gcp_resources, GcpResources())\n  gcp_resources_split = gcp_resources_proto.resources[0].resource_uri.partition(\n      'projects')\n  resource_name = gcp_resources_split[1] + gcp_resources_split[2]\n  prefix_str = gcp_resources_split[0]\n  prefix_str = prefix_str[:prefix_str.find(api_endpoint_suffix)]\n  api_endpoint = prefix_str[(prefix_str.rfind('//') + 2):] + api_endpoint_suffix\n\n  client_options = {'api_endpoint': api_endpoint}\n  job_client = aiplatform.gapic.JobServiceClient(client_options=client_options)\n  response = job_client.get_hyperparameter_tuning_job(name=resource_name)\n\n  return [study.Trial.to_json(trial) for trial in response.trials]\n\n"
-            ],
-            "image": "python:3.7"
-          }
-        },
-        "exec-hpo-completion": {
-          "container": {
-            "args": [
-              "--executor_input",
-              "{{$}}",
-              "--function_to_execute",
-              "hpo_completion"
-            ],
-            "command": [
-              "sh",
-              "-c",
-              "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip || python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet     --no-warn-script-location 'kfp==1.8.18' && \"$0\" \"$@\"\n",
-              "sh",
-              "-ec",
-              "program_path=$(mktemp -d)\nprintf \"%s\" \"$0\" > \"$program_path/ephemeral_component.py\"\npython3 -m kfp.v2.components.executor_main                         --component_module_path                         \"$program_path/ephemeral_component.py\"                         \"$@\"\n",
-              "\nimport kfp\nfrom kfp.v2 import dsl\nfrom kfp.v2.dsl import *\nfrom typing import *\n\ndef hpo_completion(hpo_flags: str) -> str:\n    \"\"\"\n    This function doesn nothing but wait to merge all the async HPO jobs so as \n    to gurantee that the following training module gets the latest params from\n    firestore for all warehouses.\n    \"\"\"\n    return \"true\"\n\n"
             ],
             "image": "python:3.7"
           }
@@ -760,13 +720,6 @@
             ],
             "inputs": {
               "parameters": {
-                "as_at_date": {
-                  "runtimeValue": {
-                    "constantValue": {
-                      "stringValue": "2023-02-11"
-                    }
-                  }
-                },
                 "hpo_best": {
                   "taskOutputParameter": {
                     "outputParameterKey": "Output",
@@ -794,8 +747,8 @@
               "name": "comp-condition-train-model-1"
             },
             "dependentTasks": [
-              "data-preprocess",
-              "hpo-completion"
+              "best-hpo-to-args",
+              "data-preprocess"
             ],
             "inputs": {
               "artifacts": {
@@ -813,6 +766,12 @@
                 "pipelineparam--accelerator_type": {
                   "componentInputParameter": "accelerator_type"
                 },
+                "pipelineparam--best-hpo-to-args-Output": {
+                  "taskOutputParameter": {
+                    "outputParameterKey": "Output",
+                    "producerTask": "best-hpo-to-args"
+                  }
+                },
                 "pipelineparam--custom_job_service_account": {
                   "componentInputParameter": "custom_job_service_account"
                 },
@@ -827,12 +786,6 @@
                 },
                 "pipelineparam--hp_config_suggestions_per_request": {
                   "componentInputParameter": "hp_config_suggestions_per_request"
-                },
-                "pipelineparam--hpo-completion-Output": {
-                  "taskOutputParameter": {
-                    "outputParameterKey": "Output",
-                    "producerTask": "hpo-completion"
-                  }
                 },
                 "pipelineparam--hptune_region": {
                   "componentInputParameter": "hptune_region"
@@ -864,7 +817,7 @@
               "name": "condition-train-model-1"
             },
             "triggerPolicy": {
-              "condition": "inputs.parameters['pipelineparam--hpo-completion-Output'].string_value == 'true'"
+              "condition": "inputs.parameters['pipelineparam--best-hpo-to-args-Output'].string_value == 'true'"
             }
           },
           "data-preprocess": {
@@ -924,7 +877,7 @@
                 "study_spec_metrics": {
                   "runtimeValue": {
                     "constantValue": {
-                      "stringValue": "[{\"metric_id\": \"au_roc\", \"goal\": 1}]"
+                      "stringValue": "[{\"metric_id\": \"accuracy\", \"goal\": 1}]"
                     }
                   }
                 },
@@ -962,37 +915,6 @@
             },
             "taskInfo": {
               "name": "gettrialsop"
-            }
-          },
-          "hpo-completion": {
-            "cachingOptions": {
-              "enableCache": true
-            },
-            "componentRef": {
-              "name": "comp-hpo-completion"
-            },
-            "dependentTasks": [
-              "best-hpo-to-args"
-            ],
-            "inputs": {
-              "parameters": {
-                "hpo_flags": {
-                  "runtimeValue": {
-                    "constantValue": {
-                      "stringValue": "{{$.inputs.parameters['pipelineparam--best-hpo-to-args-Output']}}"
-                    }
-                  }
-                },
-                "pipelineparam--best-hpo-to-args-Output": {
-                  "taskOutputParameter": {
-                    "outputParameterKey": "Output",
-                    "producerTask": "best-hpo-to-args"
-                  }
-                }
-              }
-            },
-            "taskInfo": {
-              "name": "hpo-completion"
             }
           },
           "hyperparameter-tuning-job": {
@@ -1082,7 +1004,7 @@
                 "study_spec_metrics": {
                   "runtimeValue": {
                     "constantValue": {
-                      "stringValue": "[{\"metric_id\": \"au_roc\", \"goal\": 1}]"
+                      "stringValue": "[{\"metric_id\": \"accuracy\", \"goal\": 1}]"
                     }
                   }
                 },

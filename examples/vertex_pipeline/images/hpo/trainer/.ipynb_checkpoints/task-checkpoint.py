@@ -265,17 +265,16 @@ def train(args: argparse.Namespace):
       **best_param_values)
 
   # save eval metrics
-  metrics = _evaluate_binary_classification(model, x_test, y_test)
+  metrics = _evaluate_binary_classification(model, x_val, y_val)
 
   # DEFINE METRIC
-  hp_metric = metrics['au_roc']
+  hp_metric = metrics['classification_report']['accuracy']
 
   hpt = hypertune.HyperTune()
 
   hpt.report_hyperparameter_tuning_metric(
-    hyperparameter_metric_tag='au_roc',
-    metric_value=hp_metric,
-    global_step=32
+    hyperparameter_metric_tag='accuracy',
+    metric_value=hp_metric
   )
 
   metric_files = str(os.listdir(os.path.dirname(hpt.metric_path)))
