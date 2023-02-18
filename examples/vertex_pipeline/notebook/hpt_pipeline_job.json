@@ -1,11 +1,11 @@
 {
   "pipelineSpec": {
     "components": {
-      "comp-best-hpo-to-args": {
-        "executorLabel": "exec-best-hpo-to-args",
+      "comp-best-hpt-to-args": {
+        "executorLabel": "exec-best-hpt-to-args",
         "inputDefinitions": {
           "parameters": {
-            "hpo_best": {
+            "hpt_best": {
               "type": "STRING"
             },
             "project_id": {
@@ -130,7 +130,7 @@
             "pipelineparam--accelerator_type": {
               "type": "STRING"
             },
-            "pipelineparam--best-hpo-to-args-Output": {
+            "pipelineparam--best-hpt-to-args-Output": {
               "type": "STRING"
             },
             "pipelineparam--custom_job_service_account": {
@@ -442,7 +442,7 @@
             "data_region": {
               "type": "STRING"
             },
-            "hpo_container_image_uri": {
+            "hpt_container_image_uri": {
               "type": "STRING"
             },
             "input_data_schema": {
@@ -464,13 +464,13 @@
     },
     "deploymentSpec": {
       "executors": {
-        "exec-best-hpo-to-args": {
+        "exec-best-hpt-to-args": {
           "container": {
             "args": [
               "--executor_input",
               "{{$}}",
               "--function_to_execute",
-              "best_hpo_to_args"
+              "best_hpt_to_args"
             ],
             "command": [
               "sh",
@@ -479,7 +479,7 @@
               "sh",
               "-ec",
               "program_path=$(mktemp -d)\nprintf \"%s\" \"$0\" > \"$program_path/ephemeral_component.py\"\npython3 -m kfp.v2.components.executor_main                         --component_module_path                         \"$program_path/ephemeral_component.py\"                         \"$@\"\n",
-              "\nimport kfp\nfrom kfp.v2 import dsl\nfrom kfp.v2.dsl import *\nfrom typing import *\n\ndef best_hpo_to_args(hpo_best: str,\n                    project_id: str,\n                    solution_name: str) -> str:\n    \"\"\"\n    Write the best HPO params to firestore. \n    We keep the output to chain this component to the hpo_completion step.\n    \"\"\"\n\n    import json\n    from datetime import datetime\n    from google.cloud import firestore\n    hpo_best = json.loads(hpo_best.replace(\"'\", '\"'))\n\n    hpo_best_dict = {}\n\n    for i in hpo_best['parameters']:\n        hpo_best_dict.update({i['parameterId']: i['value']})\n\n    for i in hpo_best['finalMeasurement']['metrics']:\n        hpo_best_dict.update({i['metricId']: i['value']})\n\n    db = firestore.Client(project=project_id)\n    task_flag=datetime.now().strftime('%Y-%m-%d %H:%M:%S')\n    db.collection(solution_name).document(task_flag).set(hpo_best_dict,merge=True)\n\n    return \"true\"\n\n"
+              "\nimport kfp\nfrom kfp.v2 import dsl\nfrom kfp.v2.dsl import *\nfrom typing import *\n\ndef best_hpt_to_args(hpt_best: str,\n                    project_id: str,\n                    solution_name: str) -> str:\n    \"\"\"\n    Write the best hpt params to firestore. \n    We keep the output to chain this component to the hpt_completion step.\n    \"\"\"\n\n    import json\n    from datetime import datetime\n    from google.cloud import firestore\n    hpt_best = json.loads(hpt_best.replace(\"'\", '\"'))\n\n    hpt_best_dict = {}\n\n    for i in hpt_best['parameters']:\n        hpt_best_dict.update({i['parameterId']: i['value']})\n\n    for i in hpt_best['finalMeasurement']['metrics']:\n        hpt_best_dict.update({i['metricId']: i['value']})\n\n    db = firestore.Client(project=project_id)\n    task_flag=datetime.now().strftime('%Y-%m-%d %H:%M:%S')\n    db.collection(solution_name).document(task_flag).set(hpt_best_dict,merge=True)\n\n    return \"true\"\n\n"
             ],
             "image": "python:3.7"
           }
@@ -638,7 +638,7 @@
               "sh",
               "-ec",
               "program_path=$(mktemp -d)\nprintf \"%s\" \"$0\" > \"$program_path/ephemeral_component.py\"\npython3 -m kfp.v2.components.executor_main                         --component_module_path                         \"$program_path/ephemeral_component.py\"                         \"$@\"\n",
-              "\nimport kfp\nfrom kfp.v2 import dsl\nfrom kfp.v2.dsl import *\nfrom typing import *\n\ndef worker_pool_specs(project_id: str,\n    data_region: str,\n    data_pipeline_root: str,\n    hpo_container_image_uri: str,\n    custom_job_service_account: str,\n    input_dataset: Input[Dataset],\n    input_data_schema: str) -> list:\n    \"\"\"\n    Pass the preprocessed data uri to HPO as a worker pool argument. The vanilla HPO API \n    doesn't support 'input data' so it's done this way.\n\n    data_preprocess -> dataset.uri -> CMDARGS -> worker_pool_specs -> HPO\n    \"\"\"\n\n    task_type = 'training'\n    display_name = 'hpo-pipeline-template'\n    fields = [field.split(':')[0] for field in input_data_schema.split(';')]\n    label = fields[-1]\n    features = ','.join(fields[0:-1])\n    CMDARGS = [\n    \"--training_data_uri=\"+str(input_dataset.uri),\n    \"--training_data_schema=\"+input_data_schema,\n    \"--label=\"+label,\n    \"--features=\"+features\n]\n\n    # The spec of the worker pools including machine type and Docker image\n    worker_pool_specs = [\n    {\n        \"machine_spec\": {\n            \"machine_type\": \"n1-standard-4\",\n        },\n        \"replica_count\": 1,\n        \"container_spec\": {\"image_uri\": hpo_container_image_uri, \"args\": CMDARGS},\n    }\n    ]\n\n    return worker_pool_specs\n\n"
+              "\nimport kfp\nfrom kfp.v2 import dsl\nfrom kfp.v2.dsl import *\nfrom typing import *\n\ndef worker_pool_specs(project_id: str,\n    data_region: str,\n    data_pipeline_root: str,\n    hpt_container_image_uri: str,\n    custom_job_service_account: str,\n    input_dataset: Input[Dataset],\n    input_data_schema: str) -> list:\n    \"\"\"\n    Pass the preprocessed data uri to hpt as a worker pool argument. The vanilla hpt API \n    doesn't support 'input data' so it's done this way.\n\n    data_preprocess -> dataset.uri -> CMDARGS -> worker_pool_specs -> hpt\n    \"\"\"\n\n    display_name = 'hpt-pipeline-template'\n    fields = [field.split(':')[0] for field in input_data_schema.split(';')]\n    label = fields[-1]\n    features = ','.join(fields[0:-1])\n    CMDARGS = [\n    \"--training_data_uri=\"+str(input_dataset.uri),\n    \"--training_data_schema=\"+input_data_schema,\n    \"--label=\"+label,\n    \"--features=\"+features\n]\n\n    # The spec of the worker pools including machine type and Docker image\n    worker_pool_specs = [\n    {\n        \"machine_spec\": {\n            \"machine_type\": \"n1-standard-4\",\n        },\n        \"replica_count\": 1,\n        \"container_spec\": {\"image_uri\": hpt_container_image_uri, \"args\": CMDARGS},\n    }\n    ]\n\n    return worker_pool_specs\n\n"
             ],
             "image": "python:3.7"
           }
@@ -646,7 +646,7 @@
       }
     },
     "pipelineInfo": {
-      "name": "training-pipeline-template"
+      "name": "hpt-pipeline-template"
     },
     "root": {
       "dag": {
@@ -671,19 +671,19 @@
           }
         },
         "tasks": {
-          "best-hpo-to-args": {
+          "best-hpt-to-args": {
             "cachingOptions": {
               "enableCache": true
             },
             "componentRef": {
-              "name": "comp-best-hpo-to-args"
+              "name": "comp-best-hpt-to-args"
             },
             "dependentTasks": [
               "getbesttrialop"
             ],
             "inputs": {
               "parameters": {
-                "hpo_best": {
+                "hpt_best": {
                   "taskOutputParameter": {
                     "outputParameterKey": "Output",
                     "producerTask": "getbesttrialop"
@@ -695,14 +695,14 @@
                 "solution_name": {
                   "runtimeValue": {
                     "constantValue": {
-                      "stringValue": "hpo-pipeline-template"
+                      "stringValue": "hpt-pipeline-template"
                     }
                   }
                 }
               }
             },
             "taskInfo": {
-              "name": "best-hpo-to-args"
+              "name": "best-hpt-to-args"
             }
           },
           "condition-train-model-1": {
@@ -710,7 +710,7 @@
               "name": "comp-condition-train-model-1"
             },
             "dependentTasks": [
-              "best-hpo-to-args",
+              "best-hpt-to-args",
               "data-preprocess"
             ],
             "inputs": {
@@ -729,10 +729,10 @@
                 "pipelineparam--accelerator_type": {
                   "componentInputParameter": "accelerator_type"
                 },
-                "pipelineparam--best-hpo-to-args-Output": {
+                "pipelineparam--best-hpt-to-args-Output": {
                   "taskOutputParameter": {
                     "outputParameterKey": "Output",
-                    "producerTask": "best-hpo-to-args"
+                    "producerTask": "best-hpt-to-args"
                   }
                 },
                 "pipelineparam--custom_job_service_account": {
@@ -780,7 +780,7 @@
               "name": "condition-train-model-1"
             },
             "triggerPolicy": {
-              "condition": "inputs.parameters['pipelineparam--best-hpo-to-args-Output'].string_value == 'true'"
+              "condition": "inputs.parameters['pipelineparam--best-hpt-to-args-Output'].string_value == 'true'"
             }
           },
           "data-preprocess": {
@@ -874,7 +874,7 @@
                 "display_name": {
                   "runtimeValue": {
                     "constantValue": {
-                      "stringValue": "hpo-pipeline-template"
+                      "stringValue": "hpt-pipeline-template"
                     }
                   }
                 },
@@ -1017,8 +1017,8 @@
                 "data_region": {
                   "componentInputParameter": "data_region"
                 },
-                "hpo_container_image_uri": {
-                  "componentInputParameter": "hpo_container_image_uri"
+                "hpt_container_image_uri": {
+                  "componentInputParameter": "hpt_container_image_uri"
                 },
                 "input_data_schema": {
                   "componentInputParameter": "training_data_schema"
@@ -1075,7 +1075,7 @@
           "hp_config_suggestions_per_request": {
             "type": "INT"
           },
-          "hpo_container_image_uri": {
+          "hpt_container_image_uri": {
             "type": "STRING"
           },
           "hptune_region": {
