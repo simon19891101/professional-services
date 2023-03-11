@@ -359,7 +359,7 @@ def conduct_vizier_trials(
   return best_param_values
 
 
-def get_best_param_values(project_id, solution_name='hpo-pipeline-template'):
+def get_best_param_values(project_id, solution_name='hpt-pipeline-template'):
     db = firestore.Client(project=project_id)
 
     docs = db.collection(solution_name).list_documents()
